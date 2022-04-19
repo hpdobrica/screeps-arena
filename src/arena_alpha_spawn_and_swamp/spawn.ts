@@ -1,24 +1,29 @@
 import { ERR_BUSY, RESOURCE_ENERGY } from "game/constants"
 import { StructureSpawn } from "game/prototypes"
 import { getObjectsByPrototype } from "game/utils"
-import { getCost, HEALER_BODY, WARRIOR_BODY, WORKER_BODY } from "./common"
-import { logger } from "./util"
+import { roles } from "./roles"
+import { getCost, logger } from "./util"
 
 
 const SPAWN_QUEUE = [
     {
-        queue: [WORKER_BODY, WORKER_BODY],
+        queue: [roles.hauler, roles.hauler, roles.hauler],
         active: true,
         counter: 0,
         repeat: 0,
     },
     {
-        queue: [WARRIOR_BODY, WARRIOR_BODY, HEALER_BODY],
+        queue: [roles.attacker, roles.attacker, roles.healer],
         active: false,
         counter: 0,
         repeat: Infinity
     }
 ]
+
+const roleCounter = Object.keys(roles).reduce<{[K:string]:number}>((acc, roleName) => {
+    acc[roleName] = 0
+    return acc
+},{})
 
 
 export function processTickForSpawn(spawn: StructureSpawn) {
@@ -28,11 +33,16 @@ export function processTickForSpawn(spawn: StructureSpawn) {
         return
     }
 
-    const spawnBody = currentQueue.queue[currentQueue.counter]
-    if (spawn.store[RESOURCE_ENERGY] >= getCost(spawnBody)) {
-        const creep = spawn.spawnCreep(spawnBody)
+    const currentSpawn = currentQueue.queue[currentQueue.counter]
+    if (spawn.store[RESOURCE_ENERGY] >= getCost(currentSpawn.body)) {
+        const creep = spawn.spawnCreep(currentSpawn.body)
         if(creep.error == ERR_BUSY) {
             return
+        }
+        if(creep.object) {
+            roleCounter[currentSpawn.name]++
+            creep.object.role = currentSpawn.name
+            creep.object.roleNumber = roleCounter[currentSpawn.name]
         }
         logger.info('spawning creep', creep)
         currentQueue.counter++
@@ -59,6 +69,4 @@ export function processTickForSpawn(spawn: StructureSpawn) {
 
 }
 
-export function getMySpawns() {
-    return getObjectsByPrototype(StructureSpawn).filter(s => s.my)
-}
+
